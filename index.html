@@ -3,7 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WallpaperStore</title> <link rel="preload" href="Wallpapers/youtube-logo.png" as="image">
+    <title>WallpaperStore</title>
+    <link rel="icon" href="Wallpapers/favicon.png" type="image/png">
+    <link rel="preload" href="Wallpapers/youtube-logo.png" as="image">
     <style>
         /* Variables de colores y fuentes */
         :root {
@@ -179,14 +181,15 @@
 
         /* Estilos del botón de retroceso */
         .back-button {
-            font-size: 1.5em;
+            width: 28px;
+            height: 28px;
             margin-right: 15px;
             cursor: pointer;
-            transition: color 0.2s;
+            transition: opacity 0.2s;
         }
 
         .back-button:hover {
-            color: var(--accent-color);
+            opacity: 0.7;
         }
 
         .wallpaper-grid {
@@ -273,7 +276,7 @@
             justify-content: center;
             align-items: center;
         }
-
+        
         .modal-content {
             max-width: 90%;
             max-height: 90%;
@@ -297,6 +300,39 @@
             color: #bbb;
             text-decoration: none;
             cursor: pointer;
+        }
+        
+        .download-modal-btn {
+            background-color: var(--accent-color);
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            text-decoration: none;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            z-index: 1001; 
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+        }
+        
+        .download-modal-btn:hover {
+            background-color: #005a9e;
+        }
+
+        /* Estilos para el título del modal de pantalla completa */
+        .modal-image-title {
+            position: absolute;
+            top: 5%; 
+            padding: 10px;
+            background-color: rgba(0, 0, 0, 0.6);
+            color: white;
+            font-weight: bold;
+            text-align: center;
+            box-sizing: border-box;
+            z-index: 100;
         }
     </style>
 </head>
@@ -338,7 +374,7 @@
             <div class="section">
                 <div class="section-header">
                     <h2 id="gallery-title-container">
-                        <span id="back-button" class="back-button">🡨</span>
+                        <img src="Wallpapers/arrow-left.svg" alt="Volver" id="back-button" class="back-button">
                         <span id="gallery-title"></span>
                     </h2>
                 </div>
@@ -350,7 +386,9 @@
 
     <div id="image-modal" class="modal">
         <span class="close-button" id="close-modal-button">&times;</span>
+        <div class="modal-image-title" id="modal-title"></div>
         <img class="modal-content" id="modal-image">
+        <a class="download-modal-btn" id="download-modal-btn" href="#" download>Descargar</a>
     </div>
 
     <script src="wallpapers.js"></script>
@@ -378,6 +416,7 @@
             return boton;
         }
 
+        // Intersection Observer para las miniaturas de la galería (mantiene el lazy loading)
         const observer = new IntersectionObserver((entries, observer) => {
             entries.forEach(entry => {
                 if (entry.isIntersecting) {
@@ -390,66 +429,79 @@
             });
         });
 
-        const carouselObserver = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    const item = entry.target;
-                    const url = item.dataset.src;
-                    if (url) {
-                        item.style.backgroundImage = `url('${url}')`;
-                    }
-                }
-            });
-        });
-
-
-        // Función para poblar el carrusel con imágenes aleatorias de PC
-        function cargarCarrusel() {
-            const contenedorCarrusel = document.getElementById('main-carousel');
-            contenedorCarrusel.innerHTML = '';
-            
+        // Función para precargar imágenes del carrusel (sin Intersection Observer)
+        function precargarCarrusel() {
             const wallpapersAleatorios = [...wallpapersPC].sort(() => 0.5 - Math.random());
             const seleccionados = wallpapersAleatorios.slice(0, 5); 
-
+            const contenedorCarrusel = document.getElementById('main-carousel');
+            
             seleccionados.forEach((nombreArchivo, index) => {
                 const url = `Wallpapers/PC/${nombreArchivo}`;
                 const nombre = getNombreLegible(nombreArchivo);
                 
                 const itemCarrusel = document.createElement('div');
                 itemCarrusel.className = 'carousel-item';
-                itemCarrusel.dataset.src = url;
-                if (index === 0) itemCarrusel.classList.add('active');
                 
+                if (index === 0) {
+                    itemCarrusel.classList.add('active');
+                    itemCarrusel.style.backgroundImage = `url('${url}')`;
+                } else {
+                    setTimeout(() => {
+                         const img = new Image();
+                         img.src = url;
+                         img.onload = () => {
+                             itemCarrusel.style.backgroundImage = `url('${url}')`;
+                         };
+                    }, 100 * (index + 1));
+                }
+
                 const infoCarrusel = document.createElement('div');
                 infoCarrusel.className = 'carousel-item-info';
                 infoCarrusel.innerHTML = `
                     <h2>${nombre}</h2>
                     <p>Wallpaper aleatorio destacado.</p>
                 `;
-
                 const botonDescarga = crearBotonDescarga(url, nombreArchivo);
-                
                 infoCarrusel.appendChild(botonDescarga);
                 itemCarrusel.appendChild(infoCarrusel);
                 contenedorCarrusel.appendChild(itemCarrusel);
-                carouselObserver.observe(itemCarrusel);
             });
         }
-
+        
         // Funcionalidad del modal
         const modal = document.getElementById('image-modal');
         const modalImagen = document.getElementById('modal-image');
+        const modalTitulo = document.getElementById('modal-title');
         const botonCerrarModal = document.getElementById('close-modal-button');
+        const botonDescargarModal = document.getElementById('download-modal-btn');
 
         function abrirModal(urlImagen) {
             modal.style.display = 'flex';
             const urlHighRes = urlImagen.replace('/thumbs', ''); 
+            
+            // Cargar la imagen y esperar a que esté lista para obtener sus dimensiones
+            modalImagen.onload = function() {
+                const nombreArchivo = urlHighRes.substring(urlHighRes.lastIndexOf('/') + 1);
+                const nombreLegible = getNombreLegible(nombreArchivo);
+                
+                // Ajustar el ancho del título para que coincida con el de la imagen
+                const imagenAncho = modalImagen.clientWidth;
+                modalTitulo.style.width = `${imagenAncho}px`;
+                modalTitulo.style.left = `calc(50% - ${imagenAncho / 2}px)`;
+
+                // Actualizar el título y el enlace del botón de descarga en el modal
+                modalTitulo.textContent = nombreLegible;
+                botonDescargarModal.href = urlHighRes;
+                botonDescargarModal.download = nombreArchivo;
+            };
+
             modalImagen.src = urlHighRes;
         }
 
         function cerrarModal() {
             modal.style.display = 'none';
             modalImagen.src = "";
+            modalTitulo.textContent = "";
         }
 
         botonCerrarModal.addEventListener('click', cerrarModal);
@@ -653,7 +705,7 @@
         });
         
         document.addEventListener('DOMContentLoaded', () => {
-            cargarCarrusel();
+            precargarCarrusel();
             renderizarWallpapers(wallpapersPC.slice(0, 4), document.getElementById('pc-wallpapers-preview'), 'pc');
             renderizarWallpapers(wallpapersMovil.slice(0, 4), document.getElementById('mobile-wallpapers-preview'), 'movil');
             preRenderizarGalerias();
