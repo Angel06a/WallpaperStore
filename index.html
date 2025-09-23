@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WallpaperStore</title> <link rel="preload" href="Wallpapers/youtube-logo.png" as="image">
+    <style>
+        /* Variables de colores y fuentes */
+        :root {
+            --bg-color: #202020;
+            --card-bg-color: #2c2c2c;
+            --text-color: #e0e0e0;
+            --accent-color: #0078d4;
+            --hover-color: #383838;
+            --border-radius: 8px;
+            --font-family: 'Segoe UI', Arial, sans-serif;
+        }
+
+        /* Estilos generales */
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: var(--font-family);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* Contenido principal */
+        .main-content {
+            flex-grow: 1;
+            padding: 20px 40px;
+            overflow-y: auto;
+        }
+
+        /* Sección de encabezado (buscador, etc) */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+        
+        /* Contenedor del buscador */
+        .search-container {
+            position: relative;
+            width: 400px;
+            display: flex;
+            align-items: center;
+        }
+
+        .search-bar {
+            width: 100%;
+            padding: 10px 15px;
+            background-color: var(--card-bg-color);
+            border-radius: var(--border-radius);
+            border: none;
+            color: var(--text-color);
+            outline: none;
+            padding-right: 40px; /* Espacio para el botón de borrado */
+            box-sizing: border-box; /* Asegura que el padding no cambie el ancho */
+        }
+
+        .clear-search {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-55%); /* Ajuste para subir la 'x' */
+            color: #888;
+            font-size: 20px;
+            cursor: pointer;
+            transition: color 0.2s;
+            display: none;
+            line-height: 1; /* Ayuda a que el carácter se posicione mejor */
+        }
+        
+        .clear-search:hover {
+            color: var(--text-color);
+        }
+        
+        /* Nuevo estilo para el logo de YouTube */
+        .youtube-logo-link {
+            display: flex;
+            align-items: center;
+        }
+
+        .youtube-logo {
+            width: 40px; 
+            height: 40px;
+            border-radius: 0;
+        }
+
+        /* Carrusel principal */
+        .carousel {
+            height: 350px;
+            background-color: var(--card-bg-color);
+            border-radius: var(--border-radius);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 40px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .carousel-item {
+            width: 100%;
+            height: 100%;
+            background-size: cover;
+            background-position: center;
+            position: absolute;
+            opacity: 0;
+            transition: opacity 1s ease-in-out; 
+            top: 0;
+            left: 0;
+        }
+
+        .carousel-item.active {
+            opacity: 1;
+            z-index: 1;
+        }
+
+        .carousel-item-info {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+            z-index: 2;
+        }
+
+        .carousel-item-info h2 {
+            margin: 0;
+            font-size: 2em;
+        }
+
+        .carousel-item-info p {
+            margin: 5px 0 15px;
+        }
+
+        .download-btn {
+            background-color: var(--accent-color);
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            text-decoration: none;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .download-btn:hover {
+            background-color: #005a9e;
+        }
+
+        /* Secciones de wallpapers */
+        .section {
+            margin-bottom: 40px;
+        }
+        
+        .section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            width: 100%;
+        }
+
+        .section-header.clickable-title h2 {
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .section-header.clickable-title h2:hover {
+            color: var(--accent-color);
+        }
+
+        /* Estilos del botón de retroceso */
+        .back-button {
+            font-size: 1.5em;
+            margin-right: 15px;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .back-button:hover {
+            color: var(--accent-color);
+        }
+
+        .wallpaper-grid {
+            display: grid;
+            gap: 20px;
+            width: 100%;
+            position: relative;
+        }
+
+        .wallpaper-grid.pc {
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        }
+
+        .wallpaper-grid.mobile {
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        }
+
+        .wallpaper-card {
+            background-color: var(--card-bg-color);
+            border-radius: var(--border-radius);
+            overflow: hidden;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            position: relative;
+            cursor: pointer;
+            content-visibility: auto;
+        }
+
+        .wallpaper-card img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.3s ease-in-out;
+        }
+
+        .wallpaper-card:hover img {
+            transform: scale(1.05);
+        }
+
+        .wallpaper-card-info {
+            padding: 10px;
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            background: linear-gradient(to top, rgba(0,0,0,0.8), rgba(0,0,0,0));
+            box-sizing: border-box;
+            opacity: 0;
+            transition: opacity 0.3s ease-in-out;
+        }
+        .wallpaper-card:hover .wallpaper-card-info {
+            opacity: 1;
+        }
+        
+        /* Estilos para el nombre de la imagen al hacer hover */
+        .image-title-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: 10px;
+            background-color: rgba(0, 0, 0, 0.6);
+            color: white;
+            font-weight: bold;
+            text-align: center;
+            opacity: 0;
+            transition: opacity 0.3s ease-in-out;
+            box-sizing: border-box;
+            pointer-events: none;
+        }
+        
+        .wallpaper-card:hover .image-title-overlay {
+            opacity: 1;
+        }
+
+        /* Estilos para el modal de imagen en pantalla completa */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.9);
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            max-width: 90%;
+            max-height: 90%;
+            object-fit: contain;
+            display: block;
+        }
+
+        .close-button {
+            position: absolute;
+            top: 20px;
+            right: 35px;
+            color: #fff;
+            font-size: 40px;
+            font-weight: bold;
+            transition: 0.3s;
+            cursor: pointer;
+        }
+
+        .close-button:hover,
+        .close-button:focus {
+            color: #bbb;
+            text-decoration: none;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="main-content" id="main-content">
+        <div class="header">
+            <div class="search-container">
+                <input type="text" class="search-bar" placeholder="Buscar wallpapers..." id="search-input">
+                <span class="clear-search" id="clear-search-button">×</span>
+            </div>
+            <a href="https://www.youtube.com/@AngeL06oficial" target="_blank" class="youtube-logo-link">
+                <img src="Wallpapers/youtube-logo.png" alt="Logo de YouTube" class="youtube-logo">
+            </a>
+        </div>
+
+        <div id="home-view">
+            <div class="carousel" id="main-carousel">
+                </div>
+
+            <div class="section">
+                <div class="section-header clickable-title">
+                    <h2 id="pc-section-title">Wallpapers para PC</h2>
+                </div>
+                <div class="wallpaper-grid pc" id="pc-wallpapers-preview">
+                    </div>
+            </div>
+
+            <div class="section">
+                <div class="section-header clickable-title">
+                    <h2 id="mobile-section-title">Wallpapers para Móvil</h2>
+                </div>
+                <div class="wallpaper-grid mobile" id="mobile-wallpapers-preview">
+                    </div>
+            </div>
+        </div>
+
+        <div id="gallery-view" style="display:none;">
+            <div class="section">
+                <div class="section-header">
+                    <h2 id="gallery-title-container">
+                        <span id="back-button" class="back-button">🡨</span>
+                        <span id="gallery-title"></span>
+                    </h2>
+                </div>
+                <div id="pc-gallery-container" class="wallpaper-grid pc" style="display: none;"></div>
+                <div id="mobile-gallery-container" class="wallpaper-grid mobile" style="display: none;"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="image-modal" class="modal">
+        <span class="close-button" id="close-modal-button">&times;</span>
+        <img class="modal-content" id="modal-image">
+    </div>
+
+    <script src="wallpapers.js"></script>
+    <script>
+        // Función que genera un nombre legible a partir del nombre del archivo
+        function getNombreLegible(nombreArchivo) {
+            const nombreSinExtension = nombreArchivo.split('.')[0];
+            return nombreSinExtension.replace(/-/g, ' ').replace(/_/g, ' ');
+        }
+        
+        // Función para crear un placeholder SVG con las proporciones adecuadas
+        function getPlaceholder(ancho, alto) {
+            const colorGris = '#2c2c2c'; // Mismo color que el fondo del carrusel
+            const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${ancho} ${alto}" width="${ancho}" height="${alto}" style="background-color: ${colorGris};"></svg>`;
+            return `data:image/svg+xml;base64,${btoa(svg)}`;
+        }
+
+        // Función para crear un botón de descarga.
+        function crearBotonDescarga(url, nombreArchivo) {
+            const boton = document.createElement('a');
+            boton.className = 'download-btn';
+            boton.textContent = 'Descargar';
+            boton.href = url;
+            boton.download = nombreArchivo;
+            return boton;
+        }
+
+        const observer = new IntersectionObserver((entries, observer) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const img = entry.target;
+                    const url = img.dataset.src;
+                    if (url) {
+                        img.src = url;
+                    }
+                }
+            });
+        });
+
+        const carouselObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const item = entry.target;
+                    const url = item.dataset.src;
+                    if (url) {
+                        item.style.backgroundImage = `url('${url}')`;
+                    }
+                }
+            });
+        });
+
+
+        // Función para poblar el carrusel con imágenes aleatorias de PC
+        function cargarCarrusel() {
+            const contenedorCarrusel = document.getElementById('main-carousel');
+            contenedorCarrusel.innerHTML = '';
+            
+            const wallpapersAleatorios = [...wallpapersPC].sort(() => 0.5 - Math.random());
+            const seleccionados = wallpapersAleatorios.slice(0, 5); 
+
+            seleccionados.forEach((nombreArchivo, index) => {
+                const url = `Wallpapers/PC/${nombreArchivo}`;
+                const nombre = getNombreLegible(nombreArchivo);
+                
+                const itemCarrusel = document.createElement('div');
+                itemCarrusel.className = 'carousel-item';
+                itemCarrusel.dataset.src = url;
+                if (index === 0) itemCarrusel.classList.add('active');
+                
+                const infoCarrusel = document.createElement('div');
+                infoCarrusel.className = 'carousel-item-info';
+                infoCarrusel.innerHTML = `
+                    <h2>${nombre}</h2>
+                    <p>Wallpaper aleatorio destacado.</p>
+                `;
+
+                const botonDescarga = crearBotonDescarga(url, nombreArchivo);
+                
+                infoCarrusel.appendChild(botonDescarga);
+                itemCarrusel.appendChild(infoCarrusel);
+                contenedorCarrusel.appendChild(itemCarrusel);
+                carouselObserver.observe(itemCarrusel);
+            });
+        }
+
+        // Funcionalidad del modal
+        const modal = document.getElementById('image-modal');
+        const modalImagen = document.getElementById('modal-image');
+        const botonCerrarModal = document.getElementById('close-modal-button');
+
+        function abrirModal(urlImagen) {
+            modal.style.display = 'flex';
+            const urlHighRes = urlImagen.replace('/thumbs', ''); 
+            modalImagen.src = urlHighRes;
+        }
+
+        function cerrarModal() {
+            modal.style.display = 'none';
+            modalImagen.src = "";
+        }
+
+        botonCerrarModal.addEventListener('click', cerrarModal);
+        window.addEventListener('click', (event) => {
+            if (event.target === modal) {
+                cerrarModal();
+            }
+        });
+        
+        // Carrusel
+        let indiceCarruselActual = 0;
+        let itemsCarrusel;
+        
+        function mostrarSiguienteItemCarrusel() {
+            const itemsCarrusel = document.querySelectorAll('.carousel-item');
+            if (itemsCarrusel.length < 2) return;
+
+            itemsCarrusel[indiceCarruselActual].classList.remove('active');
+            indiceCarruselActual = (indiceCarruselActual + 1) % itemsCarrusel.length;
+            itemsCarrusel[indiceCarruselActual].classList.add('active');
+        }
+
+        setInterval(mostrarSiguienteItemCarrusel, 5000);
+
+        // Funcionalidad de navegación y virtualización
+        const vistaPrincipal = document.getElementById('home-view');
+        const vistaGaleria = document.getElementById('gallery-view');
+        const tituloGaleria = document.getElementById('gallery-title');
+        const galeriaPC = document.getElementById('pc-gallery-container');
+        const galeriaMovil = document.getElementById('mobile-gallery-container');
+        const tituloSeccionPC = document.getElementById('pc-section-title');
+        const tituloSeccionMovil = document.getElementById('mobile-section-title');
+        const botonVolver = document.getElementById('back-button');
+        const mainContent = document.getElementById('main-content');
+        const carruselPrincipal = document.getElementById('main-carousel');
+        
+        let pcGalleryRendered = false;
+        let mobileGalleryRendered = false;
+        let categoriaActual = '';
+        
+        function renderizarWallpapers(listaArchivos, contenedorElemento, categoria) {
+            contenedorElemento.innerHTML = ''; 
+            
+            listaArchivos.forEach(nombreArchivo => {
+                const urlThumbnail = `Wallpapers/${categoria === 'pc' ? 'PC' : 'Móvil'}/thumbs/${nombreArchivo}`;
+                const urlHighRes = `Wallpapers/${categoria === 'pc' ? 'PC' : 'Móvil'}/${nombreArchivo}`;
+                const nombre = getNombreLegible(nombreArchivo);
+                const tarjeta = document.createElement('div');
+                tarjeta.className = 'wallpaper-card';
+                const imagen = document.createElement('img');
+                imagen.dataset.src = urlThumbnail; 
+                if (categoria === 'pc') {
+                    imagen.src = getPlaceholder(16, 9);
+                } else {
+                    imagen.src = getPlaceholder(9, 16);
+                }
+                imagen.alt = nombre;
+                tarjeta.onclick = () => abrirModal(urlThumbnail); 
+                const superposicionNombre = document.createElement('div');
+                superposicionNombre.className = 'image-title-overlay';
+                superposicionNombre.textContent = nombre;
+                const infoTarjeta = document.createElement('div');
+                infoTarjeta.className = 'wallpaper-card-info';
+                const botonDescarga = crearBotonDescarga(urlHighRes, nombreArchivo); 
+                botonDescarga.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                });
+                infoTarjeta.appendChild(botonDescarga);
+                tarjeta.appendChild(imagen);
+                tarjeta.appendChild(superposicionNombre);
+                tarjeta.appendChild(infoTarjeta);
+                contenedorElemento.appendChild(tarjeta);
+                observer.observe(imagen);
+            });
+        }
+
+        function preRenderizarGalerias() {
+            if (!pcGalleryRendered) {
+                renderizarWallpapers(wallpapersPC, galeriaPC, 'pc');
+                pcGalleryRendered = true;
+            }
+            if (!mobileGalleryRendered) {
+                renderizarWallpapers(wallpapersMovil, galeriaMovil, 'movil');
+                mobileGalleryRendered = true;
+            }
+        }
+        
+        function mostrarGaleria(categoria) {
+            vistaPrincipal.style.display = 'none';
+            vistaGaleria.style.display = 'block';
+            
+            galeriaPC.style.display = 'none';
+            galeriaMovil.style.display = 'none';
+
+            if (categoria === 'pc') {
+                tituloGaleria.textContent = 'Wallpapers para PC';
+                galeriaPC.style.display = 'grid';
+                categoriaActual = 'pc';
+            } else if (categoria === 'movil') {
+                tituloGaleria.textContent = 'Wallpapers para Móvil';
+                galeriaMovil.style.display = 'grid';
+                categoriaActual = 'movil';
+            }
+            
+            if (searchInput.value) {
+                manejarBusqueda();
+            }
+        }
+
+        function volver() {
+            vistaGaleria.style.display = 'none';
+            vistaPrincipal.style.display = 'block';
+            
+            if (searchInput.value === '') {
+                carruselPrincipal.style.display = 'flex';
+                document.querySelectorAll('.section-header.clickable-title').forEach(h => h.style.display = 'flex');
+            } else {
+                 manejarBusqueda();
+            }
+        }
+        
+        tituloSeccionPC.addEventListener('click', () => mostrarGaleria('pc'));
+        tituloSeccionMovil.addEventListener('click', () => mostrarGaleria('movil'));
+        botonVolver.addEventListener('click', volver);
+        
+        // Funcionalidad de búsqueda
+        const searchInput = document.getElementById('search-input');
+        const clearSearchButton = document.getElementById('clear-search-button');
+
+        const debounce = (func, delay) => {
+            let timeoutId;
+            return (...args) => {
+                clearTimeout(timeoutId);
+                timeoutId = setTimeout(() => {
+                    func.apply(this, args);
+                }, delay);
+            };
+        };
+
+        function manejarBusqueda() {
+            const query = searchInput.value.toLowerCase();
+            
+            // Mostrar u ocultar el botón de borrado
+            if (query.length > 0) {
+                clearSearchButton.style.display = 'block';
+            } else {
+                clearSearchButton.style.display = 'none';
+            }
+
+            const esVistaPrincipal = vistaPrincipal.style.display !== 'none';
+            const esVistaGaleria = vistaGaleria.style.display !== 'none';
+
+            const seccionesHeader = document.querySelectorAll('.section-header.clickable-title');
+            
+            // Ocultar/Mostrar el carrusel y los títulos de sección
+            if (esVistaPrincipal) {
+                carruselPrincipal.style.display = query.length > 0 ? 'none' : 'flex';
+                seccionesHeader.forEach(h => h.style.display = query.length > 0 ? 'none' : 'flex');
+            }
+
+            let tarjetas;
+            if (esVistaPrincipal) {
+                const pcPreviewCards = document.querySelectorAll('#pc-wallpapers-preview .wallpaper-card');
+                const mobilePreviewCards = document.querySelectorAll('#mobile-wallpapers-preview .wallpaper-card');
+                tarjetas = [...pcPreviewCards, ...mobilePreviewCards];
+
+                // Si no hay búsqueda, mostramos las previews
+                if (query === '') {
+                    renderizarWallpapers(wallpapersPC.slice(0, 4), document.getElementById('pc-wallpapers-preview'), 'pc');
+                    renderizarWallpapers(wallpapersMovil.slice(0, 4), document.getElementById('mobile-wallpapers-preview'), 'movil');
+                } else {
+                    const resultadosPC = wallpapersPC.filter(nombre => getNombreLegible(nombre).toLowerCase().includes(query)).slice(0, 4);
+                    const resultadosMovil = wallpapersMovil.filter(nombre => getNombreLegible(nombre).toLowerCase().includes(query)).slice(0, 4);
+                    
+                    renderizarWallpapers(resultadosPC, document.getElementById('pc-wallpapers-preview'), 'pc');
+                    renderizarWallpapers(resultadosMovil, document.getElementById('mobile-wallpapers-preview'), 'movil');
+                }
+            } else if (esVistaGaleria) {
+                const contenedor = categoriaActual === 'pc' ? galeriaPC : galeriaMovil;
+                const todasLasTarjetas = contenedor.querySelectorAll('.wallpaper-card');
+                
+                todasLasTarjetas.forEach(tarjeta => {
+                    const nombre = tarjeta.querySelector('.image-title-overlay').textContent.toLowerCase();
+                    if (nombre.includes(query)) {
+                        tarjeta.style.display = 'block';
+                    } else {
+                        tarjeta.style.display = 'none';
+                    }
+                });
+            }
+        }
+        
+        const manejarBusquedaDebounced = debounce(manejarBusqueda, 300);
+        searchInput.addEventListener('input', manejarBusquedaDebounced);
+
+        // Funcionalidad para borrar el campo de búsqueda
+        clearSearchButton.addEventListener('click', () => {
+            searchInput.value = '';
+            manejarBusqueda();
+            searchInput.focus(); // Opcional: vuelve a poner el cursor en la barra
+        });
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            cargarCarrusel();
+            renderizarWallpapers(wallpapersPC.slice(0, 4), document.getElementById('pc-wallpapers-preview'), 'pc');
+            renderizarWallpapers(wallpapersMovil.slice(0, 4), document.getElementById('mobile-wallpapers-preview'), 'movil');
+            preRenderizarGalerias();
+        });
+    </script>
+</body>
+</html>
