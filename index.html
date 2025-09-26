@@ -422,9 +422,47 @@
                 if (entry.isIntersecting) {
                     const img = entry.target;
                     const url = img.dataset.src;
-                    if (url) {
+                    const baseName = img.dataset.baseName;
+                    const folder = img.dataset.folder;
+                    const attempts = JSON.parse(img.dataset.attempts);
+                    
+                    // Si ya tiene una URL (por un intento anterior o por la lógica inicial)
+                    if (url && url !== 'placeholder') {
                         img.src = url;
+                        observer.unobserve(img);
+                        return;
                     }
+
+                    // Función para intentar cargar el thumbnail con el siguiente formato
+                    function tryLoadThumb(index) {
+                        if (index >= attempts.length) {
+                             // Fallo total. Mantenemos el placeholder y dejamos de observar
+                            img.src = getPlaceholder(img.naturalWidth || 16, img.naturalHeight || 9);
+                            observer.unobserve(img);
+                            return;
+                        }
+
+                        const currentExt = attempts[index];
+                        const thumbUrl = `${folder}/thumbs/${baseName}${currentExt}`;
+                        
+                        const tempImg = new Image();
+                        tempImg.onload = function() {
+                            // Éxito: asignamos la URL real y detenemos la observación
+                            img.src = thumbUrl;
+                            img.dataset.src = thumbUrl; // Actualizamos el dataset para abrirModal
+                            observer.unobserve(img);
+                        };
+                        
+                        tempImg.onerror = function() {
+                            // Falla: intentamos el siguiente formato
+                            tryLoadThumb(index + 1);
+                        };
+                        
+                        tempImg.src = thumbUrl;
+                    }
+
+                    // Iniciar el proceso de prueba de formatos para la miniatura
+                    tryLoadThumb(0);
                 }
             });
         });
@@ -474,28 +512,82 @@
         const modalTitulo = document.getElementById('modal-title');
         const botonCerrarModal = document.getElementById('close-modal-button');
         const botonDescargarModal = document.getElementById('download-modal-btn');
+        
+        // Formatos que intentaremos cargar en alta resolución si el principal falla
+        // Incluimos .webp por buenas prácticas, aunque la lista de wallpapers no lo use
+        const FORMATOS_ALTERNATIVOS = ['.png', '.jpg', '.jpeg', '.webp']; 
 
-        function abrirModal(urlImagen) {
+        function abrirModal(urlThumbnail) {
             modal.style.display = 'flex';
-            const urlHighRes = urlImagen.replace('/thumbs', ''); 
             
-            // Cargar la imagen y esperar a que esté lista para obtener sus dimensiones
-            modalImagen.onload = function() {
-                const nombreArchivo = urlHighRes.substring(urlHighRes.lastIndexOf('/') + 1);
-                const nombreLegible = getNombreLegible(nombreArchivo);
-                
-                // Ajustar el ancho del título para que coincida con el de la imagen
-                const imagenAncho = modalImagen.clientWidth;
-                modalTitulo.style.width = `${imagenAncho}px`;
-                modalTitulo.style.left = `calc(50% - ${imagenAncho / 2}px)`;
+            // 1. Obtener el nombre del archivo base y la carpeta
+            const pathParts = urlThumbnail.split('/');
+            const fileNameWithExt = pathParts.pop();
+            const imageFolder = pathParts.join('/'); // Ejemplo: 'Wallpapers/PC'
+            
+            // 2. Separar nombre y extensión base de la miniatura
+            const parts = fileNameWithExt.split('.');
+            const originalExt = parts.length > 1 ? '.' + parts.pop().toLowerCase() : ''; 
+            const baseName = parts.join('.'); // Nombre del archivo SIN extensión
 
-                // Actualizar el título y el enlace del botón de descarga en el modal
-                modalTitulo.textContent = nombreLegible;
-                botonDescargarModal.href = urlHighRes;
-                botonDescargarModal.download = nombreArchivo;
-            };
+            // 3. Construir la lista de formatos a probar (el formato del thumb primero)
+            let formatosATrabar = [originalExt];
+            FORMATOS_ALTERNATIVOS.forEach(ext => {
+                if (ext !== originalExt) {
+                    formatosATrabar.push(ext);
+                }
+            });
 
-            modalImagen.src = urlHighRes;
+            let intentos = 0;
+
+            function tryLoadImage(url) {
+                // Función para actualizar el modal si la imagen se carga con éxito
+                const handleLoadSuccess = function() {
+                    modalImagen.onload = null; 
+                    modalImagen.onerror = null; 
+                    
+                    const nombreArchivo = url.substring(url.lastIndexOf('/') + 1);
+                    const nombreLegible = getNombreLegible(nombreArchivo);
+                    
+                    const imagenAncho = modalImagen.clientWidth;
+                    modalTitulo.style.width = `${imagenAncho}px`;
+                    modalTitulo.style.left = `calc(50% - ${imagenAncho / 2}px)`;
+
+                    modalTitulo.textContent = nombreLegible;
+                    botonDescargarModal.href = url;
+                    botonDescargarModal.download = nombreArchivo;
+                    botonDescargarModal.style.display = 'inline-block';
+                };
+
+                // Función para manejar el error de carga y probar el siguiente formato
+                const handleError = function() {
+                    intentos++;
+                    if (intentos < formatosATrabar.length) {
+                        const nextExt = formatosATrabar[intentos];
+                        // Reemplazar la carpeta /thumbs/ y usar el nuevo formato
+                        const nextUrl = `${imageFolder}/${baseName}${nextExt}`.replace('/thumbs', ''); 
+                        tryLoadImage(nextUrl); // Intentar con el siguiente formato
+                    } else {
+                        // Fallo total
+                        modalImagen.onload = null; 
+                        modalImagen.onerror = null;
+                        console.error('No se pudo cargar la imagen en ningún formato alternativo:', baseName);
+                        modalTitulo.textContent = 'Error: Imagen no encontrada.';
+                        modalTitulo.style.width = '300px';
+                        modalTitulo.style.left = 'calc(50% - 150px)';
+                        botonDescargarModal.style.display = 'none';
+                    }
+                };
+
+                // Asignar los handlers y cargar la imagen
+                modalImagen.onload = handleLoadSuccess;
+                modalImagen.onerror = handleError;
+                modalImagen.src = url;
+            }
+            
+            // 4. Comenzar la carga con el primer formato de la lista (que será el del thumbnail)
+            const initialUrl = `${imageFolder}/${baseName}${formatosATrabar[0]}`.replace('/thumbs', '');
+            tryLoadImage(initialUrl);
         }
 
         function cerrarModal() {
@@ -542,33 +634,65 @@
         let mobileGalleryRendered = false;
         let categoriaActual = '';
         
+        // La función de renderizado de wallpapers ahora es más flexible para la miniatura
         function renderizarWallpapers(listaArchivos, contenedorElemento, categoria) {
             contenedorElemento.innerHTML = ''; 
+            const folderName = categoria === 'pc' ? 'Wallpapers/PC' : 'Wallpapers/Móvil';
+            const thumbFormats = ['.jpg', '.png', '.jpeg', '.webp']; // Orden de prioridad para probar la miniatura
             
             listaArchivos.forEach(nombreArchivo => {
-                const urlThumbnail = `Wallpapers/${categoria === 'pc' ? 'PC' : 'Móvil'}/thumbs/${nombreArchivo}`;
-                const urlHighRes = `Wallpapers/${categoria === 'pc' ? 'PC' : 'Móvil'}/${nombreArchivo}`;
+                // 1. Obtener el nombre base del archivo (sin extensión)
+                const nombreBase = nombreArchivo.split('.')[0];
+                
+                // 2. La URL de alta resolución se mantiene con el formato de la lista
+                const urlHighRes = `${folderName}/${nombreArchivo}`;
+                
                 const nombre = getNombreLegible(nombreArchivo);
                 const tarjeta = document.createElement('div');
                 tarjeta.className = 'wallpaper-card';
+                
                 const imagen = document.createElement('img');
-                imagen.dataset.src = urlThumbnail; 
+                
+                // DATASET para que el Intersection Observer pueda intentar cargar la imagen
+                imagen.dataset.src = 'placeholder'; // Marcador para iniciar la carga
+                imagen.dataset.baseName = nombreBase;
+                imagen.dataset.folder = folderName;
+                imagen.dataset.attempts = JSON.stringify(thumbFormats);
+                
+                // Usar placeholder y setear dimensiones
                 if (categoria === 'pc') {
                     imagen.src = getPlaceholder(16, 9);
+                    imagen.naturalWidth = 16;
+                    imagen.naturalHeight = 9;
                 } else {
                     imagen.src = getPlaceholder(9, 16);
+                    imagen.naturalWidth = 9;
+                    imagen.naturalHeight = 16;
                 }
+                
                 imagen.alt = nombre;
-                tarjeta.onclick = () => abrirModal(urlThumbnail); 
+                
+                // La URL del thumbnail es incierta, así que se la pasamos al modal con el formato principal
+                // Si la miniatura se cargó como .png, urlThumbnail se actualizará en el observer.
+                // Usamos el nombre base y probamos el formato más común de thumb para el primer intento
+                const initialThumbUrl = `${folderName}/thumbs/${nombreBase}${thumbFormats[0]}`; 
+                tarjeta.onclick = () => {
+                    // Si el observer encontró la URL real del thumb, la usa. Si no, usa el intento inicial.
+                    const finalThumbUrl = imagen.dataset.src !== 'placeholder' ? imagen.dataset.src : initialThumbUrl;
+                    abrirModal(finalThumbUrl);
+                }; 
+                
                 const superposicionNombre = document.createElement('div');
                 superposicionNombre.className = 'image-title-overlay';
                 superposicionNombre.textContent = nombre;
                 const infoTarjeta = document.createElement('div');
                 infoTarjeta.className = 'wallpaper-card-info';
+                
                 const botonDescarga = crearBotonDescarga(urlHighRes, nombreArchivo); 
                 botonDescarga.addEventListener('click', (event) => {
                     event.stopPropagation();
                 });
+                
                 infoTarjeta.appendChild(botonDescarga);
                 tarjeta.appendChild(imagen);
                 tarjeta.appendChild(superposicionNombre);
@@ -664,10 +788,6 @@
 
             let tarjetas;
             if (esVistaPrincipal) {
-                const pcPreviewCards = document.querySelectorAll('#pc-wallpapers-preview .wallpaper-card');
-                const mobilePreviewCards = document.querySelectorAll('#mobile-wallpapers-preview .wallpaper-card');
-                tarjetas = [...pcPreviewCards, ...mobilePreviewCards];
-
                 // Si no hay búsqueda, mostramos las previews
                 if (query === '') {
                     renderizarWallpapers(wallpapersPC.slice(0, 4), document.getElementById('pc-wallpapers-preview'), 'pc');
