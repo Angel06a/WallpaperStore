@@ -1,10 +1,12 @@
 const wallpapersPC = [
     "ChainsawMan",
+    "Goku-Legends",
     "LiuKangMK1",
     "ModernXP-Day",
     "ModernXP-Night",
     "ModernXP-Sunset",
     "Paisaje-ciervo",
+    "ScorpionMK11",
     "ultramanVSgodzilla",
     "WindowsBlue",
     "WindowsPurple"
