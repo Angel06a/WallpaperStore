@@ -15,6 +15,7 @@ const wallpapersPC = [
 
 const wallpapersMovil = [
     "demonslayer",
+    "Goku-&-Freezer-Legends",
     "hunterXhunter",
     "LiuKangMK1",
     "ultramanVSgodzilla"
