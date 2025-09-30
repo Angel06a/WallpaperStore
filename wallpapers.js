@@ -19,6 +19,8 @@ const wallpapersMovil = [
     "Goku-&-Freezer-Legends",
     "hunterXhunter",
     "LiuKangMK1",
+    "ScorpionMK11",
+    "Tekken-3",
     "ultramanVSgodzilla"
     // Agrega aquí todos los nombres de archivo para Móvil
 ];
