@@ -7,6 +7,7 @@ const wallpapersPC = [
     "ModernXP-Sunset",
     "Paisaje-ciervo",
     "ScorpionMK11",
+    "Tekken-3",
     "ultramanVSgodzilla",
     "WindowsBlue",
     "WindowsPurple"
