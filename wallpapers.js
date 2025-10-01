@@ -6,6 +6,7 @@ const wallpapersPC = [
     "ModernXP-Night",
     "ModernXP-Sunset",
     "Paisaje-ciervo",
+    "Romcom",
     "ScorpionMK11",
     "Tekken-3",
     "ultramanVSgodzilla",
@@ -17,6 +18,7 @@ const wallpapersPC = [
 const wallpapersMovil = [
     "demonslayer",
     "Goku-&-Freezer-Legends",
+    "Goku-Legends",
     "hunterXhunter",
     "LiuKangMK1",
     "ScorpionMK11",
