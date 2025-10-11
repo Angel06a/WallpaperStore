@@ -34,3 +34,16 @@ const wallpapersMovil = [
     "ultramanVSgodzilla"
     // Agrega aquí todos los nombres de archivo para Móvil
 ];
+
+const wallpapersCarrusel = [
+    "ChainsawMan",
+    "Goku-Legends",
+    "LiuKangMK1",
+    "ModernXP-Day",
+    "ModernXP-Night",
+    "ModernXP-Sunset",
+    "ScorpionMK11",
+    "ultramanVSgodzilla",
+    "WindowsBlue",
+    "WindowsPurple"
+]; 
