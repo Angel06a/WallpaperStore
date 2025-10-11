@@ -68,13 +68,13 @@
             position: absolute;
             right: 15px;
             top: 50%;
-            transform: translateY(-55%); /* Ajuste para subir la 'x' */
+            transform: translateY(-55%);
             color: #888;
             font-size: 20px;
             cursor: pointer;
             transition: color 0.2s;
             display: none;
-            line-height: 1; /* Ayuda a que el carácter se posicione mejor */
+            line-height: 1; 
         }
         
         .clear-search:hover {
@@ -106,6 +106,7 @@
             position: relative;
         }
 
+        /* MEJORA: Transición más ligera solo para la opacidad */
         .carousel-item {
             width: 100%;
             height: 100%;
@@ -116,6 +117,7 @@
             transition: opacity 1s ease-in-out; 
             top: 0;
             left: 0;
+            /* Agregado para lazy loading: el fondo se establece dinámicamente */
         }
 
         .carousel-item.active {
@@ -207,6 +209,7 @@
             grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
         }
 
+        /* MEJORA: Usar content-visibility: auto para optimizar renderizado */
         .wallpaper-card {
             background-color: var(--card-bg-color);
             border-radius: var(--border-radius);
@@ -214,7 +217,7 @@
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
             position: relative;
             cursor: pointer;
-            content-visibility: auto;
+            content-visibility: auto; /* IMPORTANTE para rendimiento */
         }
 
         .wallpaper-card img {
@@ -242,7 +245,6 @@
             opacity: 1;
         }
         
-        /* Estilos para el nombre de la imagen al hacer hover */
         .image-title-overlay {
             position: absolute;
             top: 0;
@@ -393,45 +395,31 @@
 
     <script src="wallpapers.js"></script>
     <script>
-        // Formatos que intentaremos cargar en alta resolución y para la descarga
+        // Formatos principales para las galerías (prioridad)
         const FORMATOS_PRIMARIOS = ['.png', '.jpg', '.jpeg', '.webp']; 
-
-        // Función que genera un nombre legible a partir del nombre del archivo
-        function getNombreLegible(nombreArchivo) {
-            // Si el nombreArchivo no tiene extensión (es el nombre base), lo usa directamente
-            const nombreSinExtension = nombreArchivo.includes('.') ? nombreArchivo.split('.')[0] : nombreArchivo;
-            return nombreSinExtension.replace(/-/g, ' ').replace(/_/g, ' ');
-        }
+        // Formatos específicos para el carrusel (solo JPG/JPEG en prioridad)
+        const FORMATOS_CARRUSEL = ['.jpg', '.jpeg']; 
         
-        // Función para crear un placeholder SVG con las proporciones adecuadas
-        function getPlaceholder(ancho, alto) {
-            const colorGris = '#2c2c2c'; // Mismo color que el fondo del carrusel
-            const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${ancho} ${alto}" width="${ancho}" height="${alto}" style="background-color: ${colorGris};"></svg>`;
-            return `data:image/svg+xml;base64,${btoa(svg)}`;
-        }
+        // *******************************************************************
+        // * Lógica de inicialización: Si wallpapersCarrusel no existe, usa wallpapersPC
+        // *******************************************************************
+        const listaCarrusel = typeof wallpapersCarrusel !== 'undefined' ? wallpapersCarrusel : wallpapersPC;
 
-        // Intersection Observer para las miniaturas de la galería (mantiene el lazy loading)
-        const observer = new IntersectionObserver((entries, observer) => {
+        // *******************************************************************
+        // * INTERSECTION OBSERVERS
+        // *******************************************************************
+        
+        // 1. Observer para las miniaturas (secciones y galería)
+        const thumbObserver = new IntersectionObserver((entries, observer) => {
             entries.forEach(entry => {
                 if (entry.isIntersecting) {
                     const img = entry.target;
-                    const url = img.dataset.src;
                     const baseName = img.dataset.baseName;
                     const folder = img.dataset.folder;
                     const attempts = JSON.parse(img.dataset.attempts);
                     
-                    // Si ya tiene una URL (por un intento anterior o por la lógica inicial)
-                    if (url && url !== 'placeholder') {
-                        img.src = url;
-                        observer.unobserve(img);
-                        return;
-                    }
-
-                    // Función para intentar cargar el thumbnail con el siguiente formato
                     function tryLoadThumb(index) {
                         if (index >= attempts.length) {
-                            // Fallo total. Mantenemos el placeholder y dejamos de observar
-                            img.src = getPlaceholder(img.naturalWidth || 16, img.naturalHeight || 9);
                             observer.unobserve(img);
                             return;
                         }
@@ -441,77 +429,140 @@
                         
                         const tempImg = new Image();
                         tempImg.onload = function() {
-                            // Éxito: asignamos la URL real y detenemos la observación
                             img.src = thumbUrl;
-                            img.dataset.src = thumbUrl; // Actualizamos el dataset
                             observer.unobserve(img);
                         };
                         
                         tempImg.onerror = function() {
-                            // Falla: intentamos el siguiente formato
                             tryLoadThumb(index + 1);
                         };
                         
                         tempImg.src = thumbUrl;
                     }
-
-                    // Iniciar el proceso de prueba de formatos para la miniatura
                     tryLoadThumb(0);
                 }
             });
+        }, {
+            rootMargin: '100px 0px', // Cargar 100px antes de que entren en vista
+            threshold: 0.01
+        });
+        
+        // 2. Observer para los elementos del carrusel (el fondo)
+        const carouselObserver = new IntersectionObserver((entries, observer) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const item = entry.target;
+                    const nombreBase = item.dataset.baseName;
+                    const carruselFolder = item.dataset.folder;
+                    const formatos = JSON.parse(item.dataset.attempts);
+                    
+                    // Solo cargar si aún no tiene un background (lazy load)
+                    if (!item.style.backgroundImage) {
+                        function tryLoadCarousel(i) {
+                            if (i >= formatos.length) return;
+                            
+                            const url = `${carruselFolder}/${nombreBase}${formatos[i]}`;
+                            const img = new Image();
+                            
+                            img.onload = () => {
+                                item.style.backgroundImage = `url('${url}')`;
+                                item.dataset.url = url; // Guarda la URL para la descarga
+                                observer.unobserve(item); // Deja de observar una vez cargado
+                            };
+
+                            img.onerror = () => {
+                                tryLoadCarousel(i + 1);
+                            };
+                            
+                            img.src = url;
+                        }
+                        tryLoadCarousel(0);
+                    } else {
+                        observer.unobserve(item);
+                    }
+                }
+            });
+        }, {
+            rootMargin: '0px',
+            threshold: 0.1
         });
 
-        // Función para precargar imágenes del carrusel 
-        function precargarCarrusel() {
-            const wallpapersAleatorios = [...wallpapersPC].sort(() => 0.5 - Math.random());
+
+        // Función que genera un nombre legible a partir del nombre del archivo
+        function getNombreLegible(nombreArchivo) {
+            const nombreSinExtension = nombreArchivo.includes('.') ? nombreArchivo.split('.')[0] : nombreArchivo;
+            return nombreSinExtension.replace(/-/g, ' ').replace(/_/g, ' ');
+        }
+        
+        // Función para crear un placeholder SVG con las proporciones adecuadas
+        function getPlaceholder(ancho, alto) {
+            const colorGris = '#2c2c2c'; 
+            const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${ancho} ${alto}" width="${ancho}" height="${alto}" style="background-color: ${colorGris};"></svg>`;
+            return `data:image/svg+xml;base64,${btoa(svg)}`;
+        }
+
+        // *******************************************************************
+        // * CARRUSEL (Lazy Loading)
+        // *******************************************************************
+
+        function inicializarCarrusel() {
+            const wallpapersAleatorios = [...listaCarrusel].sort(() => 0.5 - Math.random());
             const seleccionados = wallpapersAleatorios.slice(0, 5); 
             const contenedorCarrusel = document.getElementById('main-carousel');
-            const formatos = FORMATOS_PRIMARIOS; // Usar la lista principal de formatos
+            const carruselFolder = 'Wallpapers/Carrusel'; 
 
             seleccionados.forEach((nombreBase, index) => {
                 const nombre = getNombreLegible(nombreBase);
                 const itemCarrusel = document.createElement('div');
                 itemCarrusel.className = 'carousel-item';
                 
-                // Función para intentar cargar imagen de carrusel
-                function loadCarouselImage(i) {
-                    if (i >= formatos.length) return;
-                    
-                    const url = `Wallpapers/PC/${nombreBase}${formatos[i]}`;
-                    const img = new Image();
-                    img.src = url;
+                // Setear dataset para el Observer
+                itemCarrusel.dataset.baseName = nombreBase;
+                itemCarrusel.dataset.folder = carruselFolder;
+                itemCarrusel.dataset.attempts = JSON.stringify(FORMATOS_CARRUSEL);
 
-                    img.onload = () => {
-                        itemCarrusel.style.backgroundImage = `url('${url}')`;
-                        if (index === 0) itemCarrusel.classList.add('active');
-                        
-                        const infoCarrusel = document.createElement('div');
-                        infoCarrusel.className = 'carousel-item-info';
-                        infoCarrusel.innerHTML = `
-                            <h2>${nombre}</h2>
-                            <p>Wallpaper aleatorio destacado.</p>
-                        `;
-                        
-                        const botonDescarga = document.createElement('a');
-                        botonDescarga.className = 'download-btn';
-                        botonDescarga.textContent = 'Descargar';
-                        botonDescarga.href = url; // Usa la URL que se cargó
-                        botonDescarga.download = nombreBase + formatos[i];
-                        
-                        infoCarrusel.appendChild(botonDescarga);
-                        itemCarrusel.appendChild(infoCarrusel);
-                        contenedorCarrusel.appendChild(itemCarrusel);
-                    };
-
-                    img.onerror = () => {
-                        loadCarouselImage(i + 1);
-                    };
-                }
-
-                setTimeout(() => loadCarouselImage(0), 100 * (index + 1));
+                if (index === 0) itemCarrusel.classList.add('active'); // Mostrar el primero
+                
+                const infoCarrusel = document.createElement('div');
+                infoCarrusel.className = 'carousel-item-info';
+                infoCarrusel.innerHTML = `
+                    <h2>${nombre}</h2>
+                    <p>Wallpaper aleatorio destacado.</p>
+                `;
+                
+                const botonDescarga = document.createElement('a');
+                botonDescarga.className = 'download-btn';
+                botonDescarga.textContent = 'Descargar';
+                
+                // La URL real se establecerá cuando el observer cargue la imagen
+                botonDescarga.href = '#'; 
+                botonDescarga.download = nombreBase; 
+                
+                // Listener para actualizar el enlace de descarga en el momento del click
+                botonDescarga.addEventListener('click', (e) => {
+                    const url = itemCarrusel.dataset.url;
+                    if (!url || url === '#') {
+                        e.preventDefault();
+                        console.warn("Imagen de carrusel no cargada aún. Intente de nuevo.");
+                        return;
+                    }
+                    // Establecer el enlace final y el nombre de archivo con extensión
+                    const finalExt = url.substring(url.lastIndexOf('.'));
+                    botonDescarga.href = url;
+                    botonDescarga.download = nombreBase + finalExt;
+                });
+                
+                infoCarrusel.appendChild(botonDescarga);
+                itemCarrusel.appendChild(infoCarrusel);
+                contenedorCarrusel.appendChild(itemCarrusel);
+                
+                // Observar para el lazy loading
+                carouselObserver.observe(itemCarrusel);
             });
         }
         
+        // ... (resto de funciones inalteradas) ...
+
         // Funcionalidad del modal
         const modal = document.getElementById('image-modal');
         const modalImagen = document.getElementById('modal-image');
@@ -519,11 +570,12 @@
         const botonCerrarModal = document.getElementById('close-modal-button');
         const botonDescargarModal = document.getElementById('download-modal-btn');
         
+        
         // Ahora recibe solo el nombre base y la carpeta
         function abrirModal(nombreBase, folderName) { 
             modal.style.display = 'flex';
             
-            let formatosATrabar = FORMATOS_PRIMARIOS;
+            let formatosATrabar = FORMATOS_PRIMARIOS; // La galería sigue usando todos los formatos
             let intentos = 0;
 
             function tryLoadImage(url) {
@@ -591,7 +643,6 @@
         
         // Carrusel
         let indiceCarruselActual = 0;
-        let itemsCarrusel;
         
         function mostrarSiguienteItemCarrusel() {
             const itemsCarrusel = document.querySelectorAll('.carousel-item');
@@ -613,18 +664,23 @@
         const tituloSeccionPC = document.getElementById('pc-section-title');
         const tituloSeccionMovil = document.getElementById('mobile-section-title');
         const botonVolver = document.getElementById('back-button');
-        const mainContent = document.getElementById('main-content');
         const carruselPrincipal = document.getElementById('main-carousel');
         
         let pcGalleryRendered = false;
         let mobileGalleryRendered = false;
         let categoriaActual = '';
         
-        // La lista de archivos ahora solo se espera que contenga el nombre base (sin extensión)
-        function renderizarWallpapers(listaNombresBase, contenedorElemento, categoria) {
-            contenedorElemento.innerHTML = ''; 
+        // Renderiza las tarjetas de forma eficiente usando el Observer de miniaturas
+        function renderizarWallpapers(listaNombresBase, contenedorElemento, categoria, isPreview = false) {
+            // Solo limpia si es una preview o una búsqueda, NO si es la renderización inicial de galería
+            if (isPreview || contenedorElemento.id === 'pc-wallpapers-preview' || contenedorElemento.id === 'mobile-wallpapers-preview') {
+                contenedorElemento.innerHTML = '';
+            } else if (contenedorElemento.childElementCount > 0 && !isPreview) {
+                // Si la galería ya está renderizada (preRenderizarGalerias), no hacemos nada
+                return;
+            }
+
             const folderName = categoria === 'pc' ? 'Wallpapers/PC' : 'Wallpapers/Móvil';
-            // Orden de prioridad para probar la miniatura
             const thumbFormats = ['.jpg', '.png', '.jpeg', '.webp']; 
             
             listaNombresBase.forEach(nombreBase => { 
@@ -635,13 +691,12 @@
                 
                 const imagen = document.createElement('img');
                 
-                // DATASET para que el Intersection Observer pueda intentar cargar la miniatura
-                imagen.dataset.src = 'placeholder'; 
+                // Se asignan los datos para el observer
                 imagen.dataset.baseName = nombreBase; 
                 imagen.dataset.folder = folderName;
                 imagen.dataset.attempts = JSON.stringify(thumbFormats);
                 
-                // Usar placeholder y setear dimensiones
+                // Usar placeholder SVG como src inicial
                 if (categoria === 'pc') {
                     imagen.src = getPlaceholder(16, 9);
                     imagen.naturalWidth = 16;
@@ -654,7 +709,6 @@
                 
                 imagen.alt = nombre;
                 
-                // Modificamos el onclick para pasar el nombreBase y la carpeta
                 tarjeta.onclick = () => {
                     abrirModal(nombreBase, folderName);
                 }; 
@@ -665,15 +719,11 @@
                 const infoTarjeta = document.createElement('div');
                 infoTarjeta.className = 'wallpaper-card-info';
                 
-                // Botón de descarga: Usa el primer formato principal como URL inicial
                 const botonDescarga = document.createElement('a');
                 botonDescarga.className = 'download-btn';
                 botonDescarga.textContent = 'Descargar';
-                
-                // Se le da la URL del primer intento
                 botonDescarga.href = `${folderName}/${nombreBase}${FORMATOS_PRIMARIOS[0]}`; 
-                botonDescarga.download = nombreBase; // Descarga con el nombre base
-                
+                botonDescarga.download = nombreBase; 
                 botonDescarga.addEventListener('click', (event) => {
                     event.stopPropagation();
                 });
@@ -683,10 +733,13 @@
                 tarjeta.appendChild(superposicionNombre);
                 tarjeta.appendChild(infoTarjeta);
                 contenedorElemento.appendChild(tarjeta);
-                observer.observe(imagen);
+                
+                // Observar la imagen para su carga diferida
+                thumbObserver.observe(imagen);
             });
         }
-
+        
+        // MEJORA: Pre-renderiza la galería completa una sola vez al inicio
         function preRenderizarGalerias() {
             if (!pcGalleryRendered) {
                 renderizarWallpapers(wallpapersPC, galeriaPC, 'pc');
@@ -698,6 +751,7 @@
             }
         }
         
+        // MEJORA: Solo cambia la visibilidad, sin re-renderizar
         function mostrarGaleria(categoria) {
             vistaPrincipal.style.display = 'none';
             vistaGaleria.style.display = 'block';
@@ -716,7 +770,11 @@
             }
             
             if (searchInput.value) {
-                manejarBusqueda();
+                // Re-filtrar si hay búsqueda activa
+                manejarBusqueda(true); 
+            } else {
+                // Asegurar que todas se muestren si no hay búsqueda
+                 (categoriaActual === 'pc' ? galeriaPC : galeriaMovil).querySelectorAll('.wallpaper-card').forEach(t => t.style.display = 'block');
             }
         }
 
@@ -728,6 +786,7 @@
                 carruselPrincipal.style.display = 'flex';
                 document.querySelectorAll('.section-header.clickable-title').forEach(h => h.style.display = 'flex');
             } else {
+                 // Si hay búsqueda, mostrar los resultados de la preview
                  manejarBusqueda();
             }
         }
@@ -740,6 +799,7 @@
         const searchInput = document.getElementById('search-input');
         const clearSearchButton = document.getElementById('clear-search-button');
 
+        // MEJORA: Debounce para evitar ejecuciones excesivas de búsqueda
         const debounce = (func, delay) => {
             let timeoutId;
             return (...args) => {
@@ -750,10 +810,10 @@
             };
         };
 
-        function manejarBusqueda() {
+        // El parámetro forceGalleryFilter obliga a filtrar la galería si estamos en ella.
+        function manejarBusqueda(forceGalleryFilter = false) {
             const query = searchInput.value.toLowerCase();
             
-            // Mostrar u ocultar el botón de borrado
             if (query.length > 0) {
                 clearSearchButton.style.display = 'block';
             } else {
@@ -765,32 +825,33 @@
 
             const seccionesHeader = document.querySelectorAll('.section-header.clickable-title');
             
-            // Ocultar/Mostrar el carrusel y los títulos de sección
             if (esVistaPrincipal) {
                 carruselPrincipal.style.display = query.length > 0 ? 'none' : 'flex';
                 seccionesHeader.forEach(h => h.style.display = query.length > 0 ? 'none' : 'flex');
-            }
 
-            let tarjetas;
-            if (esVistaPrincipal) {
-                // Si no hay búsqueda, mostramos las previews
                 if (query === '') {
-                    renderizarWallpapers(wallpapersPC.slice(0, 4), document.getElementById('pc-wallpapers-preview'), 'pc');
-                    renderizarWallpapers(wallpapersMovil.slice(0, 4), document.getElementById('mobile-wallpapers-preview'), 'movil');
+                    // Carga normal de previews
+                    renderizarWallpapers(wallpapersPC.slice(0, 4), document.getElementById('pc-wallpapers-preview'), 'pc', true);
+                    renderizarWallpapers(wallpapersMovil.slice(0, 4), document.getElementById('mobile-wallpapers-preview'), 'movil', true);
                 } else {
+                    // Filtrar y renderizar previews de búsqueda
                     const resultadosPC = wallpapersPC.filter(nombreBase => getNombreLegible(nombreBase).toLowerCase().includes(query)).slice(0, 4);
                     const resultadosMovil = wallpapersMovil.filter(nombreBase => getNombreLegible(nombreBase).toLowerCase().includes(query)).slice(0, 4);
                     
-                    renderizarWallpapers(resultadosPC, document.getElementById('pc-wallpapers-preview'), 'pc');
-                    renderizarWallpapers(resultadosMovil, document.getElementById('mobile-wallpapers-preview'), 'movil');
+                    renderizarWallpapers(resultadosPC, document.getElementById('pc-wallpapers-preview'), 'pc', true);
+                    renderizarWallpapers(resultadosMovil, document.getElementById('mobile-wallpapers-preview'), 'movil', true);
                 }
-            } else if (esVistaGaleria) {
+            } 
+            
+            // FILTRO DE GALERÍA (aplica en vista galería O si se le fuerza el filtro al cambiar a ella)
+            if (esVistaGaleria || forceGalleryFilter) {
                 const contenedor = categoriaActual === 'pc' ? galeriaPC : galeriaMovil;
                 const todasLasTarjetas = contenedor.querySelectorAll('.wallpaper-card');
                 
                 todasLasTarjetas.forEach(tarjeta => {
+                    // Aquí usamos el overlay que tiene el nombre legible completo, incluso si está oculto
                     const nombre = tarjeta.querySelector('.image-title-overlay').textContent.toLowerCase();
-                    if (nombre.includes(query)) {
+                    if (query === '' || nombre.includes(query)) {
                         tarjeta.style.display = 'block';
                     } else {
                         tarjeta.style.display = 'none';
@@ -806,13 +867,21 @@
         clearSearchButton.addEventListener('click', () => {
             searchInput.value = '';
             manejarBusqueda();
-            searchInput.focus(); // Opcional: vuelve a poner el cursor en la barra
+            searchInput.focus(); 
         });
         
+        // *******************************************************************
+        // * INICIALIZACIÓN FINAL
+        // *******************************************************************
         document.addEventListener('DOMContentLoaded', () => {
-            precargarCarrusel();
-            renderizarWallpapers(wallpapersPC.slice(0, 4), document.getElementById('pc-wallpapers-preview'), 'pc');
-            renderizarWallpapers(wallpapersMovil.slice(0, 4), document.getElementById('mobile-wallpapers-preview'), 'movil');
+            // 1. Inicializa el carrusel (solo estructura, el observer cargará las imágenes)
+            inicializarCarrusel(); 
+            
+            // 2. Renderiza las Previews del Home (muestra las primeras 4 de cada una)
+            renderizarWallpapers(wallpapersPC.slice(0, 4), document.getElementById('pc-wallpapers-preview'), 'pc', true);
+            renderizarWallpapers(wallpapersMovil.slice(0, 4), document.getElementById('mobile-wallpapers-preview'), 'movil', true);
+            
+            // 3. MEJORA: Pre-renderiza la galería COMPLETA (oculta, para evitar lag al cambiar de vista)
             preRenderizarGalerias();
         });
     </script>
